@@ -62,7 +62,18 @@ func (r *Reader) BeginFileWatching(mgr bundle.NewManagement, strict bool) error 
 						continue
 					}
 					var succeeded bool
-					if nameClean == filepath.Clean(r.mainPath) {
+
+					isConfigFile := false
+					if len(r.configPaths) > 0 {
+						for _, path := range r.configPaths {
+							if filepath.Clean(path) == nameClean {
+								isConfigFile = true
+								break
+							}
+						}
+					}
+
+					if isConfigFile {
 						succeeded = r.reactMainUpdate(mgr, strict)
 					} else if _, exists := r.streamFileInfo[nameClean]; exists {
 						succeeded = r.reactStreamUpdate(mgr, strict, nameClean)
@@ -90,10 +101,12 @@ func (r *Reader) BeginFileWatching(mgr bundle.NewManagement, strict bool) error 
 		}
 	}()
 
-	if !r.streamsMode && r.mainPath != "" {
-		if err := watcher.Add(r.mainPath); err != nil {
-			_ = watcher.Close()
-			return err
+	if !r.streamsMode && len(r.configPaths) > 0 {
+		for _, path := range r.configPaths {
+			if err := watcher.Add(path); err != nil {
+				_ = watcher.Close()
+				return err
+			}
 		}
 	}
 

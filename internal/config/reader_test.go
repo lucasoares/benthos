@@ -14,7 +14,7 @@ import (
 )
 
 func newDummyReader(confFilePath string) *Reader {
-	rdr := NewReader(confFilePath, nil)
+	rdr := NewReader([]string{confFilePath}, nil)
 	rdr.changeDelayPeriod = 1 * time.Millisecond
 	rdr.changeFlushPeriod = 1 * time.Millisecond
 	return rdr

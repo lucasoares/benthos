@@ -137,11 +137,10 @@ func Run() {
 			Aliases: []string{"s"},
 			Usage:   "set a field (identified by a dot path) in the main configuration file, e.g. `\"metrics.type=prometheus\"`",
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
-			Value:   "",
-			Usage:   "a path to a configuration file",
+			Usage:   "the path to one or multiple configuration files.",
 		},
 		&cli.StringSliceFlag{
 			Name:    "resources",
@@ -230,7 +229,7 @@ Either run Benthos as a stream processor or choose a command:
 			}
 
 			if code := cmdService(
-				c.String("config"),
+				c.StringSlice("config"),
 				c.StringSlice("resources"),
 				c.StringSlice("set"),
 				c.String("log.level"),
@@ -256,7 +255,7 @@ variables have been resolved:
 
   benthos -c ./config.yaml echo | less`[1:],
 				Action: func(c *cli.Context) error {
-					_, _, confReader := readConfig(c.String("config"), false, c.StringSlice("resources"), nil, c.StringSlice("set"))
+					_, _, confReader := readConfig(c.StringSlice("config"), false, c.StringSlice("resources"), nil, c.StringSlice("set"))
 					conf := config.New()
 					if _, err := confReader.Read(&conf); err != nil {
 						fmt.Fprintf(os.Stderr, "Configuration file read error: %v\n", err)
@@ -316,7 +315,7 @@ https://benthos.dev/docs/guides/streams_mode/about`[1:],
 				},
 				Action: func(c *cli.Context) error {
 					os.Exit(cmdService(
-						c.String("config"),
+						c.StringSlice("config"),
 						c.StringSlice("resources"),
 						c.StringSlice("set"),
 						c.String("log.level"),

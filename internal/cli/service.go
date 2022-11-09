@@ -40,8 +40,8 @@ type stoppable interface {
 
 //------------------------------------------------------------------------------
 
-func readConfig(path string, streamsMode bool, resourcesPaths, streamsPaths, overrides []string) (mainPath string, inferred bool, conf *config.Reader) {
-	if path == "" {
+func readConfig(configPaths []string, streamsMode bool, resourcesPaths, streamsPaths, overrides []string) (mainPaths []string, inferred bool, conf *config.Reader) {
+	if len(configPaths) == 0 {
 		// Iterate default config paths
 		for _, dpath := range []string{
 			"/benthos.yaml",
@@ -50,7 +50,7 @@ func readConfig(path string, streamsMode bool, resourcesPaths, streamsPaths, ove
 		} {
 			if _, err := ifs.OS().Stat(dpath); err == nil {
 				inferred = true
-				path = dpath
+				configPaths = []string{dpath}
 				break
 			}
 		}
@@ -62,7 +62,7 @@ func readConfig(path string, streamsMode bool, resourcesPaths, streamsPaths, ove
 	if streamsMode {
 		opts = append(opts, config.OptSetStreamPaths(streamsPaths...))
 	}
-	return path, inferred, config.NewReader(path, resourcesPaths, opts...)
+	return configPaths, inferred, config.NewReader(configPaths, resourcesPaths, opts...)
 }
 
 //------------------------------------------------------------------------------
@@ -226,7 +226,7 @@ func initNormalMode(
 }
 
 func cmdService(
-	confPath string,
+	confPath []string,
 	resourcesPaths []string,
 	confOverrides []string,
 	overrideLogLevel string,
@@ -234,7 +234,7 @@ func cmdService(
 	streamsMode bool,
 	streamsPaths []string,
 ) int {
-	mainPath, inferredMainPath, confReader := readConfig(confPath, streamsMode, resourcesPaths, streamsPaths, confOverrides)
+	configPaths, inferredMainPath, confReader := readConfig(confPath, streamsMode, resourcesPaths, streamsPaths, confOverrides)
 	conf := config.New()
 
 	lints, err := confReader.Read(&conf)
@@ -286,12 +286,12 @@ func cmdService(
 		return 1
 	}
 
-	if mainPath == "" {
+	if len(configPaths) == 0 {
 		logger.Infof("Running without a main config file")
 	} else if inferredMainPath {
-		logger.With("path", mainPath).Infof("Running main config from file found in a default path")
+		logger.With("path", configPaths).Infof("Running main config from file found in a default path")
 	} else {
-		logger.With("path", mainPath).Infof("Running main config from specified file")
+		logger.With("path", configPaths).Infof("Running main config from specified files")
 	}
 
 	for _, lint := range lints {

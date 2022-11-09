@@ -55,12 +55,14 @@ func LintBytes(opts LintOptions, rawBytes []byte) ([]docs.Lint, error) {
 	return Spec().LintYAML(lintCtx, &rawNode), nil
 }
 
-// ReadFileEnvSwap reads a file and replaces any environment variable
+// ReadFileEnvSwap reads multiple files and replaces any environment variable
 // interpolations before returning the contents. Linting errors are returned if
 // the file has an unexpected higher level format, such as invalid utf-8
 // encoding.
-func ReadFileEnvSwap(path string) (configBytes []byte, lints []docs.Lint, err error) {
-	configBytes, err = ifs.ReadFile(ifs.OS(), path)
+//
+// If multiple files are provided, they are concatenated together and treated as a single file.
+func ReadFileEnvSwap(path ...string) (configBytes []byte, lints []docs.Lint, err error) {
+	configBytes, err = readAllFiles(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,4 +76,21 @@ func ReadFileEnvSwap(path string) (configBytes []byte, lints []docs.Lint, err er
 
 	configBytes = ReplaceEnvVariables(configBytes)
 	return configBytes, lints, nil
+}
+
+func readAllFiles(paths []string) ([]byte, error) {
+	var configBytes []byte
+	for _, path := range paths {
+		bytes, err := ifs.ReadFile(ifs.OS(), path)
+		if err != nil {
+			return nil, err
+		}
+		if len(configBytes) > 0 {
+			configBytes = append(configBytes, '\n')
+		}
+
+		configBytes = append(configBytes, bytes...)
+	}
+
+	return configBytes, nil
 }

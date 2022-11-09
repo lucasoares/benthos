@@ -38,7 +38,7 @@ cache_resources:
       ttl: 13
 `), 0o644))
 
-	rdr := config.NewReader("", nil, config.OptSetStreamPaths(streamOnePath, streamTwoPath))
+	rdr := config.NewReader(nil, nil, config.OptSetStreamPaths(streamOnePath, streamTwoPath))
 
 	conf := config.New()
 	lints, err := rdr.Read(&conf)
@@ -85,7 +85,7 @@ pipeline:
     - bloblang: 'root = "third"'
 `), 0o644))
 
-	rdr := config.NewReader("", nil, config.OptSetStreamPaths(streamOnePath, filepath.Join(dir, "nested")))
+	rdr := config.NewReader(nil, nil, config.OptSetStreamPaths(streamOnePath, filepath.Join(dir, "nested")))
 
 	conf := config.New()
 	lints, err := rdr.Read(&conf)

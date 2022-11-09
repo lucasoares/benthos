@@ -15,7 +15,7 @@ import (
 
 func TestSetOverridesOnNothing(t *testing.T) {
 	conf := config.New()
-	rdr := config.NewReader("", nil, config.OptAddOverrides(
+	rdr := config.NewReader(nil, nil, config.OptAddOverrides(
 		"input.type=generate",
 		"input.generate.mapping=this.foo",
 		"output.type=drop",
@@ -60,7 +60,7 @@ func TestSetOverrideErrors(t *testing.T) {
 
 	for _, test := range tests {
 		conf := config.New()
-		rdr := config.NewReader("", nil, config.OptAddOverrides(test.input))
+		rdr := config.NewReader(nil, nil, config.OptAddOverrides(test.input))
 
 		_, err := rdr.Read(&conf)
 		assert.Contains(t, err.Error(), test.err)
@@ -79,7 +79,7 @@ input:
 `), 0o644))
 
 	conf := config.New()
-	rdr := config.NewReader(fullPath, nil, config.OptAddOverrides(
+	rdr := config.NewReader([]string{fullPath}, nil, config.OptAddOverrides(
 		"input.generate.count=5",
 		"input.generate.interval=10s",
 		"output.type=drop",
@@ -134,7 +134,7 @@ tests:
 `), 0o644))
 
 	conf := config.New()
-	rdr := config.NewReader(fullPath, []string{resourceOnePath, resourceTwoPath, resourceThreePath})
+	rdr := config.NewReader([]string{fullPath}, []string{resourceOnePath, resourceTwoPath, resourceThreePath})
 
 	lints, err := rdr.Read(&conf)
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ cache_resources:
 `), 0o644))
 
 	conf := config.New()
-	rdr := config.NewReader(fullPath, []string{resourceOnePath, resourceTwoPath})
+	rdr := config.NewReader([]string{fullPath}, []string{resourceOnePath, resourceTwoPath})
 
 	lints, err := rdr.Read(&conf)
 	require.NoError(t, err)

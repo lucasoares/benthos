@@ -44,7 +44,7 @@ type Reader struct {
 	// directory walking.
 	testSuffix string
 
-	mainPath      string
+	configPaths   []string
 	resourcePaths []string
 	streamsPaths  []string
 	overrides     []string
@@ -73,10 +73,10 @@ type Reader struct {
 }
 
 // NewReader creates a new config reader.
-func NewReader(mainPath string, resourcePaths []string, opts ...OptFunc) *Reader {
+func NewReader(configPaths []string, resourcePaths []string, opts ...OptFunc) *Reader {
 	r := &Reader{
 		testSuffix:        "_benthos_test",
-		mainPath:          mainPath,
+		configPaths:       configPaths,
 		resourcePaths:     resourcePaths,
 		streamFileInfo:    map[string]streamFileInfo{},
 		resourceFileInfo:  map[string]resourceFileInfo{},
@@ -218,25 +218,35 @@ func applyOverrides(specs docs.FieldSpecs, root *yaml.Node, overrides ...string)
 
 func (r *Reader) readMain(conf *Type) (lints []string, err error) {
 	defer func() {
-		if err != nil && r.mainPath != "" {
-			err = fmt.Errorf("%v: %w", r.mainPath, err)
+		if err != nil && len(r.configPaths) > 0 {
+			err = fmt.Errorf("%v: %w", r.configPaths, err)
 		}
 	}()
 
-	if r.mainPath == "" && len(r.overrides) == 0 {
+	if len(r.configPaths) == 0 && len(r.overrides) == 0 {
 		return
+	}
+
+	confSpec := Spec()
+	if r.streamsMode {
+		// Spec is limited to just non-stream fields when in streams mode (no
+		// input, output, etc)
+		confSpec = SpecWithoutStream()
 	}
 
 	var rawNode yaml.Node
 	var confBytes []byte
-	if r.mainPath != "" {
+
+	if len(r.configPaths) > 0 {
 		var dLints []docs.Lint
-		if confBytes, dLints, err = ReadFileEnvSwap(r.mainPath); err != nil {
+		if confBytes, dLints, err = ReadFileEnvSwap(r.configPaths...); err != nil {
 			return
 		}
+
 		for _, l := range dLints {
 			lints = append(lints, l.Error())
 		}
+
 		if err = yaml.Unmarshal(confBytes, &rawNode); err != nil {
 			return
 		}
@@ -249,18 +259,12 @@ func (r *Reader) readMain(conf *Type) (lints []string, err error) {
 	// now (ignoring the issue).
 	r.configFileInfo.updatedAt = time.Now()
 
-	confSpec := Spec()
-	if r.streamsMode {
-		// Spec is limited to just non-stream fields when in streams mode (no
-		// input, output, etc)
-		confSpec = SpecWithoutStream()
-	}
 	if err = applyOverrides(confSpec, &rawNode, r.overrides...); err != nil {
 		return
 	}
 
 	if !bytes.HasPrefix(confBytes, []byte("# BENTHOS LINT DISABLE")) {
-		lintFilePrefix := r.mainPath
+		lintFilePrefix := r.configPaths
 		for _, lint := range confSpec.LintYAML(docs.NewLintContext(), &rawNode) {
 			lints = append(lints, fmt.Sprintf("%v%v", lintFilePrefix, lint.Error()))
 		}
