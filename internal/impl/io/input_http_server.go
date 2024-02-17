@@ -20,6 +20,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/gzip"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/benthosdev/benthos/v4/internal/api"
 	"github.com/benthosdev/benthos/v4/internal/bundle"
@@ -297,9 +300,10 @@ func init() {
 //------------------------------------------------------------------------------
 
 type httpServerInput struct {
-	conf hsiConfig
-	log  log.Modular
-	mgr  bundle.NewManagement
+	conf     hsiConfig
+	log      log.Modular
+	mgr      bundle.NewManagement
+	spanName string
 
 	mux    *mux.Router
 	server *http.Server
@@ -321,6 +325,12 @@ func newHTTPServerInput(conf hsiConfig, mgr bundle.NewManagement) (input.Streame
 	var err error
 	if len(conf.Address) > 0 {
 		gMux = mux.NewRouter()
+
+		// Instrument the mux with OpenTelemetry middleware filtering out websockets
+		gMux.Use(otelmux.Middleware("input_http_server", otelmux.WithFilter(func(r *http.Request) bool {
+			return !strings.HasPrefix(r.Header.Get("Upgrade"), "websocket")
+		})))
+
 		server = &http.Server{Addr: conf.Address}
 		if server.Handler, err = conf.CORS.WrapHandler(gMux); err != nil {
 			return nil, fmt.Errorf("bad CORS configuration: %w", err)
@@ -333,6 +343,7 @@ func newHTTPServerInput(conf hsiConfig, mgr bundle.NewManagement) (input.Streame
 		conf:         conf,
 		log:          mgr.Logger(),
 		mgr:          mgr,
+		spanName:     tracing.SpanName("input_http_server", mgr.Label()),
 		mux:          gMux,
 		server:       server,
 		transactions: make(chan message.Transaction),
@@ -458,14 +469,17 @@ func (h *httpServerInput) extractMessageFromRequest(r *http.Request) (message.Ba
 		return nil
 	})
 
+	carrier := propagation.MapCarrier{}
+	propagator := otel.GetTextMapPropagator()
+	propagator.Inject(r.Context(), &carrier)
+
 	textMapGeneric := map[string]any{}
-	for k, vals := range r.Header {
-		for _, v := range vals {
-			textMapGeneric[k] = v
-		}
+	for k, val := range carrier {
+		textMapGeneric[k] = val
 	}
 
-	_ = tracing.InitSpansFromParentTextMap(h.mgr.Tracer(), "input_http_server_post", textMapGeneric, msg)
+	_ = tracing.InitSpansFromParentTextMap(h.mgr.Tracer(), h.spanName, textMapGeneric, msg)
+
 	return msg, nil
 }
 
@@ -724,6 +738,8 @@ func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
 		msg := message.QuickBatch([][]byte{msgBytes})
 		startedAt := time.Now()
 
+		tracing.InitSpans(h.mgr.Tracer(), "input_http_server_websocket", msg)
+
 		part := msg.Get(0)
 		part.MetaSetMut("http_server_user_agent", r.UserAgent())
 		for k, v := range r.Header {
@@ -742,7 +758,6 @@ func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
 		for _, c := range r.Cookies() {
 			part.MetaSetMut(c.Name, c.Value)
 		}
-		tracing.InitSpans(h.mgr.Tracer(), "input_http_server_websocket", msg)
 
 		store := transaction.NewResultStore()
 		transaction.AddResultStore(msg, store)

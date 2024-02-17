@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 
 	"github.com/benthosdev/benthos/v4/internal/api"
 	"github.com/benthosdev/benthos/v4/internal/batch"
@@ -207,6 +208,8 @@ func newHTTPServerOutput(conf hsoConfig, mgr bundle.NewManagement) (output.Strea
 	var err error
 	if len(conf.Address) > 0 {
 		gMux = mux.NewRouter()
+		gMux.Use(otelmux.Middleware("output_http_server"))
+
 		server = &http.Server{Addr: conf.Address}
 		if server.Handler, err = conf.CORS.WrapHandler(gMux); err != nil {
 			return nil, fmt.Errorf("bad CORS configuration: %w", err)

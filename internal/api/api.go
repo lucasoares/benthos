@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	yaml "gopkg.in/yaml.v3"
 
 	"github.com/benthosdev/benthos/v4/internal/component/metrics"
@@ -65,6 +67,12 @@ func New(
 	opts ...OptFunc,
 ) (*Type, error) {
 	gMux := mux.NewRouter()
+
+	// Instrument the mux with OpenTelemetry middleware filtering out websockets
+	gMux.Use(otelmux.Middleware("api", otelmux.WithFilter(func(r *http.Request) bool {
+		return !strings.HasPrefix(r.Header.Get("Upgrade"), "websocket")
+	})))
+
 	server := &http.Server{Addr: conf.Address}
 
 	var err error

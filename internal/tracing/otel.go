@@ -15,6 +15,14 @@ const (
 	name = "benthos"
 )
 
+func SpanName(componentType string, componentLabel string) string {
+	if componentLabel != "" {
+		return componentType + "_" + componentLabel
+	}
+
+	return componentType
+}
+
 // GetSpan returns a span attached to a message part. Returns nil if the part
 // doesn't have a span attached.
 func GetSpan(p *message.Part) *Span {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
 	ibloblang "github.com/benthosdev/benthos/v4/internal/bloblang"
@@ -486,6 +487,7 @@ func (e *Environment) RegisterOtelTracerProvider(name string, spec *ConfigSpec, 
 		if err != nil {
 			return nil, err
 		}
+		otel.SetTracerProvider(t)
 		return t, nil
 	}, componentSpec)
 }
